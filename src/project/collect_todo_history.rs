@@ -51,14 +51,19 @@ pub async fn collect_todo_history(
         // (i.e. the first iteration, where we get all files in the commit)
         let supported_files: Vec<_> = if let Some(prev_hash) = &previous_commit_hash {
             // Common path: derive modified files from git diff, no get_files_list needed
-            get_modified_files(prev_hash, commit_hash)
-                .await
-                .into_iter()
-                .filter(|file| {
-                    identify_not_ignored_file(file, ignores)
-                        && identify_supported_file(file)
-                })
-                .collect::<Vec<_>>()
+            match get_modified_files(prev_hash, commit_hash).await {
+                Ok(files) => files
+                    .into_iter()
+                    .filter(|file| {
+                        identify_not_ignored_file(file, ignores)
+                            && identify_supported_file(file)
+                    })
+                    .collect::<Vec<_>>(),
+                Err(e) => {
+                    eprintln!("Warning: Failed to get modified files for {}: {}", commit_hash, e);
+                    Vec::new()
+                }
+            }
         } else {
             // First iteration: need to get all files in this commit
             match get_files_list(Some(commit_hash.as_str())).await {
